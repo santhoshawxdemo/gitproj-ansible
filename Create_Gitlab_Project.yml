@@ -1,0 +1,7 @@
+---
+
+- name: Generate Gitlab Config & setup
+  hosts: all
+  
+  roles:
+  - self_GIT_Project

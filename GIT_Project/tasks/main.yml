@@ -1,0 +1,55 @@
+# tasks file
+
+- name: Generate Gitlab host
+  template: src=gitlabconfig.j2 dest="/tmp/{{Project_Name}}.xml"
+  
+  
+- name: Create Gitlab project
+  block:
+  - name: Create project CLI
+    shell: /usr/local/bin/gitlab -c /tmp/{{Project_Name}}.xml project create --name "{{ Project_Name }}" --sudo "{{ Project_Owner }}" |head -l |awk ' {print $2} '
+	register: projectresult
+
+  - name: debug jenkins build create
+    debug:
+	  var: projectresult
+	  verbosity: 1
+	  
+  rescue:
+    - name: fail- failed
+	  fail:
+	    msg: "couldnot setup - {{ Project_Name }} "
+
+- name: get the gitlab url
+  block:
+  - name: find url
+    uri:
+	   url: "{{ Gitlab_URL_Proto }}://{{ Gitlab_URL_Host }}/api/v4/projects/{{ projectresult.stdout}}/?private_token=074ec46f6d5c4dd0eff77961685e68251da79dd9  "
+	   method: GET
+	   headers:
+	      Content-Type: "application/json"
+	   return_content: yes
+       status_code:200
+    register: GitProjectinfo
+    when: projectresult.stderr == ""
+
+  - name: Debug gitlab info
+    debug:
+        var: GitProjectinfo
+        verbosity: 1
+    when: projectresult.stderr == ""
+
+  rescue:
+  - name: Fail-failes
+    fail: "could not get" 
+	
+- name: generate gitlab host on linux
+  template: src=email_template.j2 dest=/tmp/{{Project_Name}}.email_template.xml
+  when: projectresult.stderr == ""
+
+- name: send an email to requestor
+  shell: /usr/sbin/sendmail {{ email_notify }} < /tmp/{{ Project_Name}}.email_template.xml
+  when: projectresult.stderr == ""
+  register: email_success
+
+  
